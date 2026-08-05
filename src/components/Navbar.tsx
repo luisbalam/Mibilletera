@@ -32,7 +32,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 PRO
               </span>
             </h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">Control Inteligente MXN</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 flex items-center gap-1">
+              <span>Control Inteligente MXN</span>
+              <span className="hidden xs:inline">•</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold hidden xs:inline">Mtro. Luis A. Balam M.</span>
+            </p>
           </div>
         </div>
 

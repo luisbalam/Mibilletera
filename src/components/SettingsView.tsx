@@ -517,9 +517,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* App Info Footer */}
-      <div className="text-center py-4 space-y-1 text-slate-400 dark:text-slate-500 text-xs">
-        <p className="font-semibold text-slate-700 dark:text-slate-300">Mi Billetera v1.0.0 — MXN</p>
-        <p className="text-[11px]">Diseño Senior Full Stack • React + TypeScript + Tailwind CSS</p>
+      <div className="text-center py-6 space-y-1.5 text-slate-500 dark:text-slate-400 text-xs border-t border-slate-200 dark:border-slate-800/80 mt-6">
+        <p className="font-extrabold text-slate-800 dark:text-slate-200 text-sm">Mi Billetera v1.0.0 PRO</p>
+        <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+          Autor: Mtro. Luis A. Balam M.
+        </p>
+        <p className="text-[11px] text-slate-400">Control Inteligente de Finanzas Personales en MXN</p>
       </div>
     </div>
   );

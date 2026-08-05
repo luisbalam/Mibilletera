@@ -40,6 +40,7 @@
 }
 
 .glass-nav {
+  padding-top: env(safe-area-inset-top, 0px);
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -47,10 +48,16 @@
 }
 
 .dark .glass-nav {
+  padding-top: env(safe-area-inset-top, 0px);
   background: rgba(11, 15, 25, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(30, 41, 59, 0.7);
+}
+
+/* Safe area bottom padding for iPhone indicator bar */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
 }
 
 /* Custom Scrollbars */

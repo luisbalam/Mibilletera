@@ -29,14 +29,15 @@ async function startServer() {
       }
 
       // Clean base64 string if it contains data URI header
-      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-      const detectedMimeType = mimeType || "image/jpeg";
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "").replace(/\s+/g, "");
+      const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
+      const detectedMimeType = mimeMatch ? mimeMatch[1] : (mimeType || "image/jpeg");
 
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        console.warn("GEMINI_API_KEY not configured in environment variables.");
+        console.warn("GEMINI_API_KEY no configurada.");
         return res.status(500).json({
-          error: "Clave de API Gemini no configurada en el servidor. Revisa los ajustes de entorno.",
+          error: "La clave GEMINI_API_KEY no está configurada en las variables de entorno.",
         });
       }
 
@@ -50,11 +51,11 @@ async function startServer() {
       });
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: [
           {
             inlineData: {
-              data: cleanBase64.replace(/\s+/g, ""),
+              data: cleanBase64,
               mimeType: detectedMimeType,
             },
           },

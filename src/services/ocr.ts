@@ -111,13 +111,14 @@ export async function scanReceiptImage(file: File): Promise<ScannedReceiptResult
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      if (errData.error) {
-        throw new Error(errData.error);
+      const serverMsg = errData.error || errData.details;
+      if (serverMsg) {
+        throw new Error(serverMsg);
       }
       if (response.status === 502 || response.status === 504) {
-        throw new Error("El servidor de análisis está ocupado o no respondió a tiempo. Por favor intenta de nuevo.");
+        throw new Error("El servicio de análisis con IA tardó demasiado o la conexión fue interrumpida. Por favor, reintenta con una foto más enfocada.");
       }
-      throw new Error(`Error del servidor (${response.status})`);
+      throw new Error(`Error de conexión con el servidor (${response.status})`);
     }
 
     const resJson = await response.json();

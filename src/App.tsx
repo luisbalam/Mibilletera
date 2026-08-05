@@ -320,6 +320,11 @@ export default function App() {
             )}
           </>
         )}
+
+        {/* Global Footer Author Credit */}
+        <footer className="text-center py-6 pb-24 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+          <p>Mi Billetera PRO • Autor: <span className="font-bold text-slate-600 dark:text-slate-300">Mtro. Luis A. Balam M.</span></p>
+        </footer>
       </main>
 
       {/* Modal to Add / Edit Transaction */}
