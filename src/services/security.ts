@@ -3,6 +3,8 @@
  * Handles PIN verification, WebAuthn (Face ID / Touch ID / Fingerprint) and lock state.
  */
 
+import { supabase } from './supabase';
+
 const PIN_STORAGE_KEY = 'mi_billetera_pin_hash';
 const LOCK_ENABLED_KEY = 'mi_billetera_lock_enabled';
 const BIOMETRICS_ENABLED_KEY = 'mi_billetera_biometrics_enabled';
@@ -51,14 +53,49 @@ function hashPin(pin: string): string {
   return 'pin_' + Math.abs(hash).toString(16) + '_' + pin.split('').reverse().join('');
 }
 
-// Set up a new 4-digit PIN
-export function savePin(pin: string): void {
+// Set up a new 4-digit PIN and sync with Supabase Cloud if available
+export async function savePin(pin: string): Promise<void> {
   if (pin.length !== 4) throw new Error('El PIN debe constar de 4 dígitos.');
-  localStorage.setItem(PIN_STORAGE_KEY, hashPin(pin));
+  const hashed = hashPin(pin);
+  localStorage.setItem(PIN_STORAGE_KEY, hashed);
   localStorage.setItem(LOCK_ENABLED_KEY, 'true');
+
+  if (supabase) {
+    try {
+      await supabase.from('app_settings').upsert({
+        key: 'master_pin_hash',
+        value: hashed,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Could not sync PIN to Supabase:', err);
+    }
+  }
 }
 
-// Verify entered 4-digit PIN
+// Fetch remote PIN hash from Supabase if present
+export async function syncRemoteSecurityState(): Promise<boolean> {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'master_pin_hash')
+        .single();
+
+      if (!error && data && data.value) {
+        localStorage.setItem(PIN_STORAGE_KEY, data.value);
+        localStorage.setItem(LOCK_ENABLED_KEY, 'true');
+        return true;
+      }
+    } catch (err) {
+      console.warn('Error fetching remote PIN setting:', err);
+    }
+  }
+  return Boolean(localStorage.getItem(PIN_STORAGE_KEY));
+}
+
+// Verify entered 4-digit PIN against local or synced remote hash
 export function verifyPin(pin: string): boolean {
   const storedHash = localStorage.getItem(PIN_STORAGE_KEY);
   if (!storedHash) return false;

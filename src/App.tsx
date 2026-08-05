@@ -13,7 +13,7 @@ import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ReceiptScannerModal } from './components/ReceiptScannerModal';
 import { LockScreen } from './components/LockScreen';
 import { Toast } from './components/Toast';
-import { getSecuritySettings } from './services/security';
+import { getSecuritySettings, syncRemoteSecurityState } from './services/security';
 import { ScannedReceiptResult } from './services/ocr';
 
 export default function App() {
@@ -32,6 +32,17 @@ export default function App() {
     const settings = getSecuritySettings();
     return settings.isLockEnabled && settings.hasPinSet;
   });
+
+  // Check remote cloud security settings on initial load
+  useEffect(() => {
+    async function checkCloudSecurity() {
+      const hasPin = await syncRemoteSecurityState();
+      if (hasPin) {
+        setIsLocked(true);
+      }
+    }
+    checkCloudSecurity();
+  }, []);
 
   // Receipt Scanner Modal state
   const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState<boolean>(false);
