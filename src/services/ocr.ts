@@ -17,52 +17,75 @@ export interface ScannedReceiptResult {
  * This prevents payload size issues (502 Bad Gateway / 413 Payload Too Large) and speeds up analysis.
  */
 async function compressImage(file: File, maxDimension = 1600, quality = 0.82): Promise<{ imageBase64: string; mimeType: string }> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const reader = new FileReader();
 
-    reader.onerror = () => reject(new Error("Error al leer el archivo de la imagen."));
+    reader.onerror = () => {
+      // Fallback
+      resolve({
+        imageBase64: '',
+        mimeType: file.type || 'image/jpeg',
+      });
+    };
 
     reader.onload = (e) => {
+      const rawResult = e.target?.result as string || '';
+      const rawBase64 = rawResult.replace(/^data:image\/\w+;base64,/, '');
+
       const img = new Image();
 
-      img.onerror = () => reject(new Error("No se pudo procesar la imagen seleccionada."));
-
-      img.onload = () => {
-        let { width, height } = img;
-
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          return reject(new Error("No se pudo obtener el contexto gráfico para procesar el ticket."));
-        }
-
-        // Draw image on canvas
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Convert to optimized JPEG
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        const cleanBase64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-
+      img.onerror = () => {
+        // Fallback to uncompressed image if HTML image element fails
         resolve({
-          imageBase64: cleanBase64,
-          mimeType: 'image/jpeg',
+          imageBase64: rawBase64,
+          mimeType: file.type || 'image/jpeg',
         });
       };
 
-      img.src = e.target?.result as string;
+      img.onload = () => {
+        try {
+          let { width, height } = img;
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            return resolve({
+              imageBase64: rawBase64,
+              mimeType: file.type || 'image/jpeg',
+            });
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          const cleanBase64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+
+          resolve({
+            imageBase64: cleanBase64,
+            mimeType: 'image/jpeg',
+          });
+        } catch (e) {
+          resolve({
+            imageBase64: rawBase64,
+            mimeType: file.type || 'image/jpeg',
+          });
+        }
+      };
+
+      img.src = rawResult;
     };
 
     reader.readAsDataURL(file);

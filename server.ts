@@ -50,22 +50,20 @@ async function startServer() {
       });
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                data: cleanBase64,
-                mimeType: detectedMimeType,
-              },
+        model: "gemini-3.6-flash",
+        contents: [
+          {
+            inlineData: {
+              data: cleanBase64.replace(/\s+/g, ""),
+              mimeType: detectedMimeType,
             },
-            {
-              text: `Analiza detenidamente la imagen de este ticket/comprobante de compra o recibo y extrae la información requerida de manera muy precisa.
+          },
+          {
+            text: `Analiza la imagen de este ticket de compra o recibo y extrae la información requerida de manera precisa.
 Categorías válidas sugeridas: Alimentos, Gasolina, Restaurantes, Servicios, Salud, Mascotas, Supermercado, Entretenimiento, Suscripciones, Ropa, Hogar, Varios.
 Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia.`,
-            },
-          ],
-        },
+          },
+        ],
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -77,7 +75,7 @@ Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferen
               },
               amount: {
                 type: Type.NUMBER,
-                description: "Monto total pagado expresado en pesos (MXN). Debe ser un número decimal positivo.",
+                description: "Monto total pagado expresado en números (ej: 150.50). Debe ser un número positivo.",
               },
               category: {
                 type: Type.STRING,
