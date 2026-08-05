@@ -11,7 +11,8 @@ async function startServer() {
   const PORT = 3000;
 
   // Body parser for JSON and large image base64 payloads
-  app.use(express.json({ limit: "15mb" }));
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // API Health Check
   app.get("/api/health", (_req, res) => {
@@ -134,6 +135,15 @@ Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferen
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Global Error Handler Middleware
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("Error en middleware del servidor:", err);
+    const statusCode = err.status || err.statusCode || 500;
+    res.status(statusCode).json({
+      error: err.message || "Error interno del servidor.",
+    });
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Servidor de Mi Billetera ejecutándose en http://localhost:${PORT}`);
