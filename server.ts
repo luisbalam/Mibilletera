@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -42,7 +42,7 @@ async function startServer() {
       } else if (cleanBase64.includes(",")) {
         cleanBase64 = cleanBase64.split(",")[1];
       }
-      cleanBase64 = cleanBase64.replace(/\s+/g, "");
+      cleanBase64 = cleanBase64.trim();
 
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
@@ -54,11 +54,6 @@ async function startServer() {
 
       const ai = new GoogleGenAI({
         apiKey: apiKey,
-        httpOptions: {
-          headers: {
-            "User-Agent": "aistudio-build",
-          },
-        },
       });
 
       const imagePart = {
@@ -69,60 +64,89 @@ async function startServer() {
       };
 
       const textPart = {
-        text: `Analiza detenidamente esta imagen de ticket o recibo de compra.
-Extrae con precisión el concepto/establecimiento, el monto total pagado, la categoría, la fecha (YYYY-MM-DD), la hora (HH:mm), la forma de pago y un resumen breve de productos.
-Categorías válidas sugeridas: Alimentos, Gasolina, Restaurantes, Servicios, Salud, Mascotas, Supermercado, Entretenimiento, Suscripciones, Ropa, Hogar, Varios.
-Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia.`,
+        text: `Analiza esta imagen de ticket de compra o recibo y extrae la información requerida en formato JSON.
+Campos a extraer:
+- concept: Nombre comercial del negocio o establecimiento (ej: OXXO, Walmart, Pemex, Restaurante, etc.).
+- amount: Monto total pagado en números (ej: 185.50). Debe ser mayor a 0.
+- category: Categoría sugerida (Alimentos, Gasolina, Restaurantes, Servicios, Salud, Mascotas, Supermercado, Entretenimiento, Suscripciones, Ropa, Hogar, Varios).
+- date: Fecha impresa en formato YYYY-MM-DD.
+- time: Hora impresa en formato HH:mm.
+- paymentMethod: Forma de pago (Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia).
+- notes: Resumen o descripción de productos del ticket.`,
       };
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: { parts: [imagePart, textPart] },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              concept: {
-                type: Type.STRING,
-                description: "Nombre comercial del negocio o establecimiento (ej: OXXO, Walmart, Pemex, Starbucks, Restaurant)",
-              },
-              amount: {
-                type: Type.NUMBER,
-                description: "Monto total pagado en número (ej: 185.50)",
-              },
-              category: {
-                type: Type.STRING,
-                description: "Categoría más apropiada del gasto",
-              },
-              date: {
-                type: Type.STRING,
-                description: "Fecha impresa en formato YYYY-MM-DD",
-              },
-              time: {
-                type: Type.STRING,
-                description: "Hora impresa en formato HH:mm",
-              },
-              paymentMethod: {
-                type: Type.STRING,
-                description: "Forma de pago (Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia)",
-              },
-              notes: {
-                type: Type.STRING,
-                description: "Resumen o lista breve de artículos del ticket",
-              },
-            },
-            required: ["concept", "amount", "category", "paymentMethod"],
+      const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          concept: {
+            type: Type.STRING,
+            description: "Nombre comercial del negocio o establecimiento",
+          },
+          amount: {
+            type: Type.NUMBER,
+            description: "Monto total pagado en número (ej: 185.50)",
+          },
+          category: {
+            type: Type.STRING,
+            description: "Categoría más apropiada del gasto",
+          },
+          date: {
+            type: Type.STRING,
+            description: "Fecha impresa en formato YYYY-MM-DD",
+          },
+          time: {
+            type: Type.STRING,
+            description: "Hora impresa en formato HH:mm",
+          },
+          paymentMethod: {
+            type: Type.STRING,
+            description: "Forma de pago (Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia)",
+          },
+          notes: {
+            type: Type.STRING,
+            description: "Resumen o lista breve de artículos del ticket",
           },
         },
-      });
+        required: ["concept", "amount", "category", "paymentMethod"],
+      };
 
-      const responseText = response.text;
-      if (!responseText) {
-        return res.status(500).json({ error: "El modelo de Inteligencia Artificial no devolvió respuesta para la imagen." });
+      let responseText = "";
+
+      // Primary attempt with gemini-3.6-flash with minimal thinking for ultra fast response
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.6-flash",
+          contents: { parts: [imagePart, textPart] },
+          config: {
+            thinkingConfig: {
+              thinkingLevel: ThinkingLevel.MINIMAL,
+            },
+            responseMimeType: "application/json",
+            responseSchema,
+          },
+        });
+        responseText = response.text || "";
+      } catch (err36) {
+        console.warn("Fallo con gemini-3.6-flash, intentando fallback con gemini-2.5-flash...", err36);
+        // Fallback attempt with gemini-2.5-flash
+        const fallbackRes = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: { parts: [imagePart, textPart] },
+          config: {
+            responseMimeType: "application/json",
+            responseSchema,
+          },
+        });
+        responseText = fallbackRes.text || "";
       }
 
-      const parsedData = JSON.parse(responseText.trim());
+      if (!responseText) {
+        return res.status(500).json({ error: "El modelo de Inteligencia Artificial no devolvió datos para la imagen provista." });
+      }
+
+      const cleanedJson = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const parsedData = JSON.parse(cleanedJson);
+
       return res.json({ success: true, data: parsedData });
     } catch (error: any) {
       console.error("Error al escanear ticket con Gemini AI:", error);

@@ -16,28 +16,24 @@ export interface ScannedReceiptResult {
  * Reduces image size to max 1600px dimension and JPEG quality 0.82.
  * This prevents payload size issues (502 Bad Gateway / 413 Payload Too Large) and speeds up analysis.
  */
-async function compressImage(file: File, maxDimension = 1600, quality = 0.82): Promise<{ imageBase64: string; mimeType: string }> {
+async function compressImage(file: File, maxDimension = 1200, quality = 0.75): Promise<{ imageBase64: string; mimeType: string }> {
   return new Promise((resolve) => {
     const reader = new FileReader();
 
     reader.onerror = () => {
-      // Fallback
-      resolve({
-        imageBase64: '',
-        mimeType: file.type || 'image/jpeg',
-      });
+      resolve({ imageBase64: '', mimeType: 'image/jpeg' });
     };
 
     reader.onload = (e) => {
-      const rawResult = e.target?.result as string || '';
+      const rawResult = (e.target?.result as string) || '';
       const rawBase64 = rawResult.replace(/^data:image\/\w+;base64,/, '');
 
       const img = new Image();
 
       img.onerror = () => {
-        // Fallback to uncompressed image if HTML image element fails
+        // Safe cap on fallback base64 length to avoid server payload errors
         resolve({
-          imageBase64: rawBase64,
+          imageBase64: rawBase64.slice(0, 1000000),
           mimeType: file.type || 'image/jpeg',
         });
       };
@@ -63,10 +59,14 @@ async function compressImage(file: File, maxDimension = 1600, quality = 0.82): P
           const ctx = canvas.getContext('2d');
           if (!ctx) {
             return resolve({
-              imageBase64: rawBase64,
-              mimeType: file.type || 'image/jpeg',
+              imageBase64: rawBase64.slice(0, 1000000),
+              mimeType: 'image/jpeg',
             });
           }
+
+          // Fill canvas with solid white background to handle PNG/HEIC transparent pixels
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
 
           ctx.drawImage(img, 0, 0, width, height);
 
@@ -79,8 +79,8 @@ async function compressImage(file: File, maxDimension = 1600, quality = 0.82): P
           });
         } catch (e) {
           resolve({
-            imageBase64: rawBase64,
-            mimeType: file.type || 'image/jpeg',
+            imageBase64: rawBase64.slice(0, 1000000),
+            mimeType: 'image/jpeg',
           });
         }
       };
