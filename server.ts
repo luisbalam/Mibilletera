@@ -28,16 +28,27 @@ async function startServer() {
         return res.status(400).json({ error: "No se proporcionó la imagen del ticket." });
       }
 
-      // Clean base64 string if it contains data URI header
-      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "").replace(/\s+/g, "");
-      const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
-      const detectedMimeType = mimeMatch ? mimeMatch[1] : (mimeType || "image/jpeg");
+      // Robust extraction of clean Base64 string and MIME type
+      let cleanBase64 = String(imageBase64);
+      let detectedMimeType = mimeType || "image/jpeg";
+
+      if (cleanBase64.includes(";base64,")) {
+        const parts = cleanBase64.split(";base64,");
+        const header = parts[0];
+        cleanBase64 = parts[1];
+        if (header.startsWith("data:")) {
+          detectedMimeType = header.replace("data:", "").trim();
+        }
+      } else if (cleanBase64.includes(",")) {
+        cleanBase64 = cleanBase64.split(",")[1];
+      }
+      cleanBase64 = cleanBase64.replace(/\s+/g, "");
 
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        console.warn("GEMINI_API_KEY no configurada.");
+        console.warn("GEMINI_API_KEY no configurada en variables de entorno.");
         return res.status(500).json({
-          error: "La clave GEMINI_API_KEY no está configurada en las variables de entorno.",
+          error: "La clave GEMINI_API_KEY no está configurada en las variables de entorno del servidor.",
         });
       }
 
@@ -50,21 +61,23 @@ async function startServer() {
         },
       });
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            inlineData: {
-              data: cleanBase64,
-              mimeType: detectedMimeType,
-            },
-          },
-          {
-            text: `Analiza la imagen de este ticket de compra o recibo y extrae la información requerida de manera precisa.
+      const imagePart = {
+        inlineData: {
+          data: cleanBase64,
+          mimeType: detectedMimeType,
+        },
+      };
+
+      const textPart = {
+        text: `Analiza detenidamente esta imagen de ticket o recibo de compra.
+Extrae con precisión el concepto/establecimiento, el monto total pagado, la categoría, la fecha (YYYY-MM-DD), la hora (HH:mm), la forma de pago y un resumen breve de productos.
 Categorías válidas sugeridas: Alimentos, Gasolina, Restaurantes, Servicios, Salud, Mascotas, Supermercado, Entretenimiento, Suscripciones, Ropa, Hogar, Varios.
 Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia.`,
-          },
-        ],
+      };
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: { parts: [imagePart, textPart] },
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -72,11 +85,11 @@ Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferen
             properties: {
               concept: {
                 type: Type.STRING,
-                description: "Nombre comercial del establecimiento o descripción principal del negocio (ej: OXXO, Walmart, Pemex, Starbucks)",
+                description: "Nombre comercial del negocio o establecimiento (ej: OXXO, Walmart, Pemex, Starbucks, Restaurant)",
               },
               amount: {
                 type: Type.NUMBER,
-                description: "Monto total pagado expresado en números (ej: 150.50). Debe ser un número positivo.",
+                description: "Monto total pagado en número (ej: 185.50)",
               },
               category: {
                 type: Type.STRING,
@@ -84,19 +97,19 @@ Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferen
               },
               date: {
                 type: Type.STRING,
-                description: "Fecha impresa en el ticket en formato YYYY-MM-DD",
+                description: "Fecha impresa en formato YYYY-MM-DD",
               },
               time: {
                 type: Type.STRING,
-                description: "Hora impresa en el ticket en formato HH:mm (24 horas)",
+                description: "Hora impresa en formato HH:mm",
               },
               paymentMethod: {
                 type: Type.STRING,
-                description: "Forma de pago detectada (Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia)",
+                description: "Forma de pago (Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia)",
               },
               notes: {
                 type: Type.STRING,
-                description: "Breve lista o resumen de los artículos clave comprados",
+                description: "Resumen o lista breve de artículos del ticket",
               },
             },
             required: ["concept", "amount", "category", "paymentMethod"],
@@ -106,16 +119,16 @@ Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferen
 
       const responseText = response.text;
       if (!responseText) {
-        return res.status(500).json({ error: "No se obtuvo respuesta del modelo AI." });
+        return res.status(500).json({ error: "El modelo de Inteligencia Artificial no devolvió respuesta para la imagen." });
       }
 
       const parsedData = JSON.parse(responseText.trim());
       return res.json({ success: true, data: parsedData });
     } catch (error: any) {
-      console.error("Error al escanear el ticket con Gemini AI:", error);
+      console.error("Error al escanear ticket con Gemini AI:", error);
       return res.status(500).json({
-        error: "Ocurrió un error al procesar la imagen del ticket.",
-        details: error?.message || String(error),
+        error: error?.message || "Ocurrió un error al analizar la imagen del ticket con Inteligencia Artificial.",
+        details: String(error),
       });
     }
   });
