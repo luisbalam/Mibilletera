@@ -1,0 +1,6 @@
+{
+  "name": "Mi Billetera",
+  "description": "Aplicación moderna e intuitiva para el control de finanzas personales, registro de ingresos, gastos y estadísticas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
