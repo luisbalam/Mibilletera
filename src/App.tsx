@@ -10,7 +10,11 @@ import { SummaryView } from './components/SummaryView';
 import { SettingsView } from './components/SettingsView';
 import { TransactionModal } from './components/TransactionModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+import { ReceiptScannerModal } from './components/ReceiptScannerModal';
+import { LockScreen } from './components/LockScreen';
 import { Toast } from './components/Toast';
+import { getSecuritySettings } from './services/security';
+import { ScannedReceiptResult } from './services/ocr';
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -22,6 +26,15 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<ViewTab>('dashboard');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // App Security Lock state
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
+    const settings = getSecuritySettings();
+    return settings.isLockEnabled && settings.hasPinSet;
+  });
+
+  // Receipt Scanner Modal state
+  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState<boolean>(false);
 
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -114,6 +127,25 @@ export default function App() {
     };
   }, [transactions]);
 
+  const handleScannedReceipt = (scanned: ScannedReceiptResult) => {
+    // Open Transaction Modal populated with scanned values
+    setEditingTransaction({
+      id: '', // temporary
+      type: scanned.type,
+      amount: scanned.amount,
+      concept: scanned.concept,
+      category: scanned.category as any,
+      date: scanned.date,
+      time: scanned.time,
+      paymentMethod: scanned.paymentMethod as any,
+      notes: scanned.notes,
+      createdAt: Date.now(),
+    });
+    setDefaultModalType(scanned.type);
+    setIsModalOpen(true);
+    showToast(`Ticket escaneado: ${scanned.concept} ($${scanned.amount.toFixed(2)} MXN)`, 'success');
+  };
+
   // Handlers
   const handleOpenNewModal = (type: TransactionType = 'gasto') => {
     setEditingTransaction(null);
@@ -184,6 +216,10 @@ export default function App() {
     reloadTransactions();
   };
 
+  if (isLocked) {
+    return <LockScreen onUnlock={() => setIsLocked(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       {/* Toast alert banner */}
@@ -199,6 +235,7 @@ export default function App() {
         onToggleTheme={toggleTheme}
         totalBalance={stats.totalBalance}
         onOpenNewTransaction={handleOpenNewModal}
+        onOpenReceiptScanner={() => setIsReceiptScannerOpen(true)}
       />
 
       {/* Main Container */}
@@ -260,6 +297,17 @@ export default function App() {
         onSave={handleSaveTransaction}
         initialData={editingTransaction}
         defaultType={defaultModalType}
+        onOpenScanner={() => {
+          setIsModalOpen(false);
+          setIsReceiptScannerOpen(true);
+        }}
+      />
+
+      {/* Modal to Scan Receipt with Gemini AI */}
+      <ReceiptScannerModal
+        isOpen={isReceiptScannerOpen}
+        onClose={() => setIsReceiptScannerOpen(false)}
+        onScanned={handleScannedReceipt}
       />
 
       {/* Modal to Confirm Deletion */}

@@ -7,6 +7,7 @@ interface NavbarProps {
   onToggleTheme: () => void;
   totalBalance: number;
   onOpenNewTransaction: (type?: 'ingreso' | 'gasto') => void;
+  onOpenReceiptScanner?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -14,6 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
   totalBalance,
   onOpenNewTransaction,
+  onOpenReceiptScanner,
 }) => {
   return (
     <header className="sticky top-0 z-30 w-full backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/80 dark:border-slate-800 transition-colors duration-300">
@@ -50,6 +52,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               {formatMXN(totalBalance)}
             </span>
           </div>
+
+          {onOpenReceiptScanner && (
+            <button
+              onClick={onOpenReceiptScanner}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all active:scale-95 cursor-pointer shadow-sm"
+              title="Escanear ticket de compra con IA Gemini"
+              id="scan-ticket-header-btn"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="hidden sm:inline">Escanear Ticket</span>
+            </button>
+          )}
 
           <button
             onClick={() => onOpenNewTransaction('gasto')}

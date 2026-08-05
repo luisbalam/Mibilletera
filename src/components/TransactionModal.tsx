@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ArrowDownRight, ArrowUpRight, DollarSign, Calendar, Clock, CreditCard, Tag, FileText, Check } from 'lucide-react';
+import { X, ArrowDownRight, ArrowUpRight, DollarSign, Calendar, Clock, CreditCard, Tag, FileText, Check, Sparkles } from 'lucide-react';
 import { Transaction, TransactionType, Category, PaymentMethod } from '../types';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, PAYMENT_METHODS, getCurrentDateStr, getCurrentTimeStr } from '../utils/formatters';
 
@@ -9,6 +9,7 @@ interface TransactionModalProps {
   onSave: (tx: Omit<Transaction, 'id' | 'createdAt'>, editingId?: string) => void;
   initialData?: Transaction | null;
   defaultType?: TransactionType;
+  onOpenScanner?: () => void;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -17,6 +18,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   onSave,
   initialData,
   defaultType = 'gasto',
+  onOpenScanner,
 }) => {
   const [type, setType] = useState<TransactionType>(defaultType);
   const [amount, setAmount] = useState<string>('');
@@ -121,13 +123,26 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
             {initialData ? 'Editar Movimiento' : 'Registrar Movimiento'}
           </h2>
-          <button
-            onClick={onClose}
-            id="modal-close-btn"
-            className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenScanner && !initialData && (
+              <button
+                type="button"
+                onClick={onOpenScanner}
+                className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-emerald-500/20"
+                title="Escanear ticket con IA Gemini"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Escanear Ticket</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              id="modal-close-btn"
+              className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Form Scrollable Body */}
