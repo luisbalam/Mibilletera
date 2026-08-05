@@ -88,10 +88,13 @@ export async function scanReceiptImage(file: File): Promise<ScannedReceiptResult
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
+      if (errData.error) {
+        throw new Error(errData.error);
+      }
       if (response.status === 502 || response.status === 504) {
         throw new Error("El servidor de análisis está ocupado o no respondió a tiempo. Por favor intenta de nuevo.");
       }
-      throw new Error(errData.error || `Error del servidor (${response.status})`);
+      throw new Error(`Error del servidor (${response.status})`);
     }
 
     const resJson = await response.json();
