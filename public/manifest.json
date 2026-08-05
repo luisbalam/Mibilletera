@@ -1,0 +1,17 @@
+{
+  "short_name": "Mi Billetera",
+  "name": "Mi Billetera - Finanzas Personales",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512 192x192 64x64 32x32"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b",
+  "display": "standalone",
+  "orientation": "portrait",
+  "description": "Control de finanzas personales, ingresos y gastos en MXN."
+}

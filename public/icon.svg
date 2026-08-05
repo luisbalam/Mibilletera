@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#0f172a"/>
+  <rect x="40" y="40" width="432" height="432" rx="96" fill="url(#grad)" opacity="0.15"/>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <!-- Wallet Body -->
+  <rect x="80" y="140" width="352" height="256" rx="28" fill="#1e293b" stroke="#334155" stroke-width="12"/>
+  <path d="M120 140V120C120 97.9086 137.909 80 160 80H352C374.091 80 392 97.9086 392 120V140" fill="none" stroke="#10b981" stroke-width="12" stroke-linecap="round"/>
+  <!-- Pocket / Card Accent -->
+  <rect x="290" y="220" width="142" height="96" rx="20" fill="#0f172a" stroke="#10b981" stroke-width="8"/>
+  <circle cx="330" cy="268" r="14" fill="#10b981"/>
+</svg>
