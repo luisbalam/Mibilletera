@@ -17,23 +17,39 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   created_at BIGINT NOT NULL
 );
 
--- 2. Habilitar Row Level Security (RLS)
-ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+-- 2. Crear la tabla de configuración global (app_settings) para sincronizar el PIN
+CREATE TABLE IF NOT EXISTS public.app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
--- 3. Crear políticas para permitir lectura, inserción, actualización y eliminación pública/anónima
-CREATE POLICY "Permitir lectura publica" ON public.transactions
+-- 3. Habilitar Row Level Security (RLS)
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+
+-- 4. Crear políticas para permitir acceso en ambas tablas
+CREATE POLICY "Permitir lectura publica transactions" ON public.transactions
   FOR SELECT USING (true);
 
-CREATE POLICY "Permitir insercion publica" ON public.transactions
+CREATE POLICY "Permitir insercion publica transactions" ON public.transactions
   FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "Permitir actualizacion publica" ON public.transactions
+CREATE POLICY "Permitir actualizacion publica transactions" ON public.transactions
   FOR UPDATE USING (true);
 
-CREATE POLICY "Permitir eliminacion publica" ON public.transactions
+CREATE POLICY "Permitir eliminacion publica transactions" ON public.transactions
   FOR DELETE USING (true);
 
--- 4. Crear índices para acelerar búsquedas y filtros por fecha y categoría
+-- Políticas para app_settings
+CREATE POLICY "Permitir lectura publica app_settings" ON public.app_settings
+  FOR SELECT USING (true);
+
+CREATE POLICY "Permitir insercion/actualizacion publica app_settings" ON public.app_settings
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- 5. Crear índices para acelerar búsquedas
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions (date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_category ON public.transactions (category);
 CREATE INDEX IF NOT EXISTS idx_transactions_type ON public.transactions (type);
+

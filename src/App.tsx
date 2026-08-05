@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Shield } from 'lucide-react';
 import { Transaction, ViewTab, SummaryStats, TransactionType } from './types';
 import { transactionRepo } from './services/storage';
 import { getCurrentDateStr, getCurrentTimeStr } from './utils/formatters';
@@ -28,20 +29,27 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
 
   // App Security Lock state
-  const [isLocked, setIsLocked] = useState<boolean>(() => {
-    const settings = getSecuritySettings();
-    return settings.isLockEnabled && settings.hasPinSet;
-  });
+  const [isInitializingSecurity, setIsInitializingSecurity] = useState<boolean>(true);
+  const [isLocked, setIsLocked] = useState<boolean>(true);
 
   // Check remote cloud security settings on initial load
   useEffect(() => {
-    async function checkCloudSecurity() {
-      const hasPin = await syncRemoteSecurityState();
-      if (hasPin) {
-        setIsLocked(true);
+    async function checkSecurityOnMount() {
+      try {
+        const hasRemotePin = await syncRemoteSecurityState();
+        if (hasRemotePin) {
+          setIsLocked(true);
+        } else {
+          const settings = getSecuritySettings();
+          setIsLocked(settings.isLockEnabled && settings.hasPinSet);
+        }
+      } catch (err) {
+        console.warn('Error verifying security:', err);
+      } finally {
+        setIsInitializingSecurity(false);
       }
     }
-    checkCloudSecurity();
+    checkSecurityOnMount();
   }, []);
 
   // Receipt Scanner Modal state
@@ -226,6 +234,19 @@ export default function App() {
     await transactionRepo.importData(importedTxs);
     reloadTransactions();
   };
+
+  if (isInitializingSecurity) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center animate-pulse">
+          <Shield className="w-6 h-6" />
+        </div>
+        <p className="text-xs text-slate-400 font-medium tracking-wide">
+          Verificando privacidad y seguridad de la billetera...
+        </p>
+      </div>
+    );
+  }
 
   if (isLocked) {
     return <LockScreen onUnlock={() => setIsLocked(false)} />;

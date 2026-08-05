@@ -81,7 +81,7 @@ export async function syncRemoteSecurityState(): Promise<boolean> {
         .from('app_settings')
         .select('value')
         .eq('key', 'master_pin_hash')
-        .single();
+        .maybeSingle();
 
       if (!error && data && data.value) {
         localStorage.setItem(PIN_STORAGE_KEY, data.value);
@@ -92,7 +92,9 @@ export async function syncRemoteSecurityState(): Promise<boolean> {
       console.warn('Error fetching remote PIN setting:', err);
     }
   }
-  return Boolean(localStorage.getItem(PIN_STORAGE_KEY));
+  const localHash = localStorage.getItem(PIN_STORAGE_KEY);
+  const isEnabled = localStorage.getItem(LOCK_ENABLED_KEY) !== 'false';
+  return Boolean(localHash) && isEnabled;
 }
 
 // Verify entered 4-digit PIN against local or synced remote hash
