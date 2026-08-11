@@ -3,6 +3,11 @@
   command = "npm run build"
 
 [[redirects]]
+  from = "/api/assistant"
+  to = "/.netlify/functions/assistant"
+  status = 200
+
+[[redirects]]
   from = "/api/scan-receipt"
   to = "/.netlify/functions/scan-receipt"
   status = 200

@@ -77,7 +77,7 @@ export async function askAssistant(
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || 'Error al comunicarse con el servicio del asistente.');
+      throw new Error(errData.error || `Error ${response.status}: No se pudo obtener respuesta del servidor del asistente.`);
     }
 
     const json = await response.json();
@@ -89,7 +89,7 @@ export async function askAssistant(
   } catch (error: any) {
     console.error('Error al consultar el asistente AI:', error);
     return {
-      reply: 'No pude procesar tu solicitud en este momento. Por favor verifica tu conexión e inténtalo nuevamente.',
+      reply: error?.message || 'No pude procesar tu solicitud en este momento. Por favor verifica tu conexión e inténtalo nuevamente.',
       action: 'NONE',
     };
   }
