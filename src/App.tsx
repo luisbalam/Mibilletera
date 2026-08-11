@@ -12,6 +12,7 @@ import { SettingsView } from './components/SettingsView';
 import { TransactionModal } from './components/TransactionModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ReceiptScannerModal } from './components/ReceiptScannerModal';
+import { AssistantPanel } from './components/AssistantPanel';
 import { LockScreen } from './components/LockScreen';
 import { Toast } from './components/Toast';
 import { getSecuritySettings, syncRemoteSecurityState } from './services/security';
@@ -54,6 +55,9 @@ export default function App() {
 
   // Receipt Scanner Modal state
   const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState<boolean>(false);
+
+  // AI Assistant Panel state
+  const [isAssistantOpen, setIsAssistantOpen] = useState<boolean>(false);
 
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -268,7 +272,9 @@ export default function App() {
         totalBalance={stats.totalBalance}
         onOpenNewTransaction={handleOpenNewModal}
         onOpenReceiptScanner={() => setIsReceiptScannerOpen(true)}
+        onOpenAssistant={() => setIsAssistantOpen(true)}
       />
+
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto px-4 pt-6 pb-20">
@@ -358,12 +364,24 @@ export default function App() {
         onConfirm={handleConfirmDelete}
       />
 
+      {/* AI Assistant Panel Drawer */}
+      <AssistantPanel
+        isOpen={isAssistantOpen}
+        onClose={() => setIsAssistantOpen(false)}
+        transactions={transactions}
+        stats={stats}
+        onSaveTransaction={handleSaveTransaction}
+        showToast={showToast}
+      />
+
       {/* Bottom Floating Navigation */}
       <BottomNav
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
         onOpenNewTransactionModal={() => handleOpenNewModal('gasto')}
+        onOpenAssistant={() => setIsAssistantOpen(true)}
       />
+
     </div>
   );
 }

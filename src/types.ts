@@ -83,3 +83,32 @@ export interface SummaryStats {
 }
 
 export type ViewTab = 'dashboard' | 'historial' | 'nuevo' | 'resumen' | 'configuracion';
+
+export interface CategoryBudget {
+  category: ExpenseCategory;
+  monthlyLimit: number;
+}
+
+export interface AssistantPendingTransaction {
+  type: TransactionType;
+  amount: number;
+  concept: string;
+  category: Category;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm
+  paymentMethod: PaymentMethod;
+  notes?: string;
+}
+
+export interface AssistantMessage {
+  id: string;
+  sender: 'user' | 'assistant';
+  text: string;
+  timestamp: number;
+  action?: 'NONE' | 'ASK_MISSING' | 'PREVIEW_CONFIRM' | 'RECORD_DIRECT' | 'OUT_OF_SCOPE' | 'PURCHASE_EVALUATION';
+  pendingTransaction?: AssistantPendingTransaction;
+  isRiskyPurchase?: boolean;
+  riskReason?: string;
+  confirmed?: boolean;
+  cancelled?: boolean;
+}
