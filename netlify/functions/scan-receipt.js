@@ -1,10 +1,25 @@
-const fetch = globalThis.fetch;
+import { GoogleGenAI, Type } from "@google/genai";
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Content-Type": "application/json",
+  };
+
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers,
+      body: "",
+    };
+  }
+
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ error: "Método no permitido" }),
     };
   }
@@ -16,7 +31,7 @@ exports.handler = async (event) => {
     if (!imageBase64) {
       return {
         statusCode: 400,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ error: "No se proporcionó la imagen del ticket." }),
       };
     }
@@ -28,125 +43,113 @@ exports.handler = async (event) => {
     if (!apiKey) {
       return {
         statusCode: 500,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
-          error: "Clave GEMINI_API_KEY no configurada en Netlify. Por favor agrégala en Netlify (Site settings > Environment variables).",
+          error: "Clave GEMINI_API_KEY no configurada en Netlify. Por favor agrégala en las variables de entorno de tu sitio en Netlify.",
         }),
       };
     }
 
-    const payload = {
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              inlineData: {
-                data: cleanBase64,
-                mimeType: detectedMimeType,
-              },
-            },
-            {
-              text: `Analiza detenidamente la imagen de este ticket/comprobante de compra o recibo y extrae la información requerida de manera muy precisa.
+    const ai = new GoogleGenAI({ apiKey });
+
+    const prompt = `Analiza detenidamente la imagen de este ticket/comprobante de compra o recibo y extrae la información requerida de manera muy precisa.
 Categorías válidas sugeridas: Alimentos, Gasolina, Restaurantes, Servicios, Salud, Mascotas, Supermercado, Entretenimiento, Suscripciones, Ropa, Hogar, Varios.
-Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia.`,
-            },
-          ],
+Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia.`;
+
+    const responseSchema = {
+      type: Type.OBJECT,
+      properties: {
+        concept: {
+          type: Type.STRING,
+          description: "Nombre comercial del establecimiento o descripción principal del negocio (ej: OXXO, Walmart, Pemex, Starbucks)",
         },
-      ],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            concept: {
-              type: "STRING",
-              description: "Nombre comercial del establecimiento o descripción principal del negocio (ej: OXXO, Walmart, Pemex, Starbucks)",
-            },
-            amount: {
-              type: "NUMBER",
-              description: "Monto total pagado expresado en pesos (MXN). Debe ser un número decimal positivo.",
-            },
-            category: {
-              type: "STRING",
-              description: "Categoría más apropiada del gasto",
-            },
-            date: {
-              type: "STRING",
-              description: "Fecha impresa en el ticket en formato YYYY-MM-DD",
-            },
-            time: {
-              type: "STRING",
-              description: "Hora impresa en el ticket en formato HH:mm (24 horas)",
-            },
-            paymentMethod: {
-              type: "STRING",
-              description: "Forma de pago detectada (Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia)",
-            },
-            notes: {
-              type: "STRING",
-              description: "Breve lista o resumen de los artículos clave comprados",
-            },
-          },
-          required: ["concept", "amount", "category", "paymentMethod"],
+        amount: {
+          type: Type.NUMBER,
+          description: "Monto total pagado expresado en pesos (MXN). Debe ser un número decimal positivo.",
+        },
+        category: {
+          type: Type.STRING,
+          description: "Categoría más apropiada del gasto",
+        },
+        date: {
+          type: Type.STRING,
+          description: "Fecha impresa en el ticket en formato YYYY-MM-DD",
+        },
+        time: {
+          type: Type.STRING,
+          description: "Hora impresa en el ticket en formato HH:mm (24 horas)",
+        },
+        paymentMethod: {
+          type: Type.STRING,
+          description: "Forma de pago detectada (Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferencia)",
+        },
+        notes: {
+          type: Type.STRING,
+          description: "Breve lista o resumen de los artículos clave comprados",
         },
       },
+      required: ["concept", "amount", "category", "paymentMethod"],
     };
 
     let responseText = "";
-    const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-    let lastErrorDetails = "";
-
-    for (const model of modelsToTry) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (!res.ok) {
-          const errText = await res.text();
-          console.warn(`Error Scan Receipt [${model}] status ${res.status}:`, errText);
-          lastErrorDetails = `Status ${res.status}: ${errText}`;
-          continue;
-        }
-
-        const data = await res.json();
-        const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (candidateText) {
-          responseText = candidateText;
-          break;
-        }
-      } catch (err) {
-        console.warn(`Excepción Scan Receipt [${model}]:`, err);
-        lastErrorDetails = err?.message || String(err);
-      }
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [
+          {
+            inlineData: {
+              data: cleanBase64,
+              mimeType: detectedMimeType,
+            },
+          },
+          { text: prompt },
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema,
+        },
+      });
+      responseText = response.text || "";
+    } catch (err20) {
+      console.warn("Fallo gemini-2.0-flash para ticket, probando gemini-1.5-flash:", err20);
+      const response15 = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [
+          {
+            inlineData: {
+              data: cleanBase64,
+              mimeType: detectedMimeType,
+            },
+          },
+          { text: prompt },
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema,
+        },
+      });
+      responseText = response15.text || "";
     }
 
     if (!responseText) {
       return {
         statusCode: 500,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          error: "No se obtuvo respuesta del modelo AI para el ticket.",
-          details: lastErrorDetails,
-        }),
+        headers,
+        body: JSON.stringify({ error: "No se obtuvo respuesta del modelo AI para el ticket." }),
       };
     }
 
     const parsedData = JSON.parse(responseText.trim());
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ success: true, data: parsedData }),
     };
   } catch (error) {
     console.error("Error en Netlify Function scan-receipt:", error);
     return {
       statusCode: 500,
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         error: "Ocurrió un error al procesar el ticket en el servidor.",
         details: error?.message || String(error),
