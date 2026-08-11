@@ -54,6 +54,11 @@ async function startServer() {
 
       const ai = new GoogleGenAI({
         apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
       });
 
       const imagePart = {
@@ -127,10 +132,10 @@ Campos a extraer:
         });
         responseText = response.text || "";
       } catch (err36) {
-        console.warn("Fallo con gemini-3.6-flash, intentando fallback con gemini-2.5-flash...", err36);
-        // Fallback attempt with gemini-2.5-flash
+        console.warn("Fallo con gemini-3.6-flash, intentando fallback con gemini-flash-latest...", err36);
+        // Fallback attempt with gemini-flash-latest
         const fallbackRes = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: "gemini-flash-latest",
           contents: { parts: [imagePart, textPart] },
           config: {
             responseMimeType: "application/json",
@@ -274,7 +279,7 @@ MENSAJE DEL USUARIO: "${message}"
 
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-2.0-flash",
+          model: "gemini-3.6-flash",
           contents: contextText,
           config: {
             systemInstruction,
@@ -283,33 +288,18 @@ MENSAJE DEL USUARIO: "${message}"
           },
         });
         responseText = response.text || "";
-      } catch (err20) {
-        console.warn("Fallo con gemini-2.0-flash, usando fallback gemini-1.5-flash:", err20);
-        try {
-          const fallbackRes = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
-            contents: contextText,
-            config: {
-              systemInstruction,
-              responseMimeType: "application/json",
-              responseSchema,
-            },
-          });
-          responseText = fallbackRes.text || "";
-        } catch (err15) {
-          console.warn("Fallo con gemini-1.5-flash, usando fallback gemini-2.5-flash:", err15);
-          const fallbackRes2 = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: contextText,
-            config: {
-              systemInstruction,
-              responseMimeType: "application/json",
-              responseSchema,
-              thinkingConfig: { thinkingBudget: 0 },
-            },
-          });
-          responseText = fallbackRes2.text || "";
-        }
+      } catch (err36) {
+        console.warn("Fallo con gemini-3.6-flash en asistente, intentando fallback con gemini-flash-latest:", err36);
+        const fallbackRes = await ai.models.generateContent({
+          model: "gemini-flash-latest",
+          contents: contextText,
+          config: {
+            systemInstruction,
+            responseMimeType: "application/json",
+            responseSchema,
+          },
+        });
+        responseText = fallbackRes.text || "";
       }
 
       if (!responseText) {

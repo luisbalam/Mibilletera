@@ -154,21 +154,21 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-xs transition-opacity animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex justify-end bg-slate-950/50 backdrop-blur-xs transition-opacity animate-fade-in">
       {/* Click outside to close */}
       <div className="flex-1" onClick={onClose} />
 
       {/* Main Drawer Container */}
       <div className="w-full sm:w-[440px] max-w-full h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col justify-between overflow-hidden animate-slide-left">
         
-        {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md flex items-center justify-between">
+        {/* Header with Safe Area Top Clearance for iPhone / Mobile */}
+        <div className="pt-[max(1rem,env(safe-area-inset-top,16px))] pb-3.5 px-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
               <Bot className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+              <h2 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2 leading-tight">
                 ASISTENTE
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   IA
@@ -181,12 +181,20 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
           </div>
 
           <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-200/60 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700 active:scale-95 flex items-center justify-center transition-all cursor-pointer shadow-sm shrink-0 relative z-30"
             title="Cerrar Asistente"
+            aria-label="Cerrar Asistente"
             id="close-assistant-btn"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5 stroke-[2.5]" />
           </button>
         </div>
 
@@ -320,7 +328,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
         </div>
 
         {/* Input Area */}
-        <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md">
+        <div className="p-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom,16px))] border-t border-slate-200 dark:border-slate-800 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md shrink-0">
           {/* Quick prompt suggestions */}
           <div className="mb-2.5 flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] scrollbar-none">
             <button

@@ -50,7 +50,14 @@ export const handler = async (event) => {
       };
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
 
     const prompt = `Analiza detenidamente la imagen de este ticket/comprobante de compra o recibo y extrae la información requerida de manera muy precisa.
 Categorías válidas sugeridas: Alimentos, Gasolina, Restaurantes, Servicios, Salud, Mascotas, Supermercado, Entretenimiento, Suscripciones, Ropa, Hogar, Varios.
@@ -94,7 +101,7 @@ Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferen
     let responseText = "";
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.6-flash",
         contents: [
           {
             inlineData: {
@@ -110,10 +117,10 @@ Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferen
         },
       });
       responseText = response.text || "";
-    } catch (err20) {
-      console.warn("Fallo gemini-2.0-flash para ticket, probando gemini-1.5-flash:", err20);
-      const response15 = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+    } catch (err36) {
+      console.warn("Fallo gemini-3.6-flash para ticket, probando fallback gemini-flash-latest:", err36);
+      const responseFallback = await ai.models.generateContent({
+        model: "gemini-flash-latest",
         contents: [
           {
             inlineData: {
@@ -128,7 +135,7 @@ Formas de pago válidas: Efectivo, Tarjeta Débito, Tarjeta Crédito, Transferen
           responseSchema,
         },
       });
-      responseText = response15.text || "";
+      responseText = responseFallback.text || "";
     }
 
     if (!responseText) {

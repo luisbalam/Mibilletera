@@ -47,7 +47,14 @@ export const handler = async (event) => {
       };
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
 
     const systemInstruction = `
 Eres el ASISTENTE FINANCIERO inteligente integrado exclusivamente en la aplicación "Mi Billetera".
@@ -147,7 +154,7 @@ MENSAJE DEL USUARIO: "${message}"
     let responseText = "";
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.6-flash",
         contents: contextText,
         config: {
           systemInstruction,
@@ -156,33 +163,18 @@ MENSAJE DEL USUARIO: "${message}"
         },
       });
       responseText = response.text || "";
-    } catch (err20) {
-      console.warn("Fallo gemini-2.0-flash en Netlify, probando gemini-1.5-flash:", err20);
-      try {
-        const response15 = await ai.models.generateContent({
-          model: "gemini-1.5-flash",
-          contents: contextText,
-          config: {
-            systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema,
-          },
-        });
-        responseText = response15.text || "";
-      } catch (err15) {
-        console.warn("Fallo gemini-1.5-flash en Netlify, probando gemini-2.5-flash:", err15);
-        const response25 = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: contextText,
-          config: {
-            systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema,
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        });
-        responseText = response25.text || "";
-      }
+    } catch (err36) {
+      console.warn("Fallo gemini-3.6-flash en Netlify, probando fallback gemini-flash-latest:", err36);
+      const responseFallback = await ai.models.generateContent({
+        model: "gemini-flash-latest",
+        contents: contextText,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema,
+        },
+      });
+      responseText = responseFallback.text || "";
     }
 
     if (!responseText) {
