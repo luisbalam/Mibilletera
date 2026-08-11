@@ -274,18 +274,6 @@ MENSAJE DEL USUARIO: "${message}"
 
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: contextText,
-          config: {
-            systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema,
-          },
-        });
-        responseText = response.text || "";
-      } catch (err25) {
-        console.warn("Fallo con gemini-2.5-flash, usando fallback gemini-2.0-flash:", err25);
-        const fallbackRes = await ai.models.generateContent({
           model: "gemini-2.0-flash",
           contents: contextText,
           config: {
@@ -294,7 +282,34 @@ MENSAJE DEL USUARIO: "${message}"
             responseSchema,
           },
         });
-        responseText = fallbackRes.text || "";
+        responseText = response.text || "";
+      } catch (err20) {
+        console.warn("Fallo con gemini-2.0-flash, usando fallback gemini-1.5-flash:", err20);
+        try {
+          const fallbackRes = await ai.models.generateContent({
+            model: "gemini-1.5-flash",
+            contents: contextText,
+            config: {
+              systemInstruction,
+              responseMimeType: "application/json",
+              responseSchema,
+            },
+          });
+          responseText = fallbackRes.text || "";
+        } catch (err15) {
+          console.warn("Fallo con gemini-1.5-flash, usando fallback gemini-2.5-flash:", err15);
+          const fallbackRes2 = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: contextText,
+            config: {
+              systemInstruction,
+              responseMimeType: "application/json",
+              responseSchema,
+              thinkingConfig: { thinkingBudget: 0 },
+            },
+          });
+          responseText = fallbackRes2.text || "";
+        }
       }
 
       if (!responseText) {

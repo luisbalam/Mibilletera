@@ -76,8 +76,26 @@ export async function askAssistant(
     });
 
     if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || `Error ${response.status}: No se pudo obtener respuesta del servidor del asistente.`);
+      let errorMessage = `Error ${response.status}: No se pudo obtener respuesta del servidor del asistente.`;
+      try {
+        const responseText = await response.text();
+        try {
+          const errData = JSON.parse(responseText);
+          if (errData && errData.error) {
+            errorMessage = errData.error;
+            if (errData.details) {
+              errorMessage += ` (${errData.details})`;
+            }
+          }
+        } catch {
+          if (responseText && responseText.trim().length > 0) {
+            errorMessage = `Error ${response.status}: ${responseText.slice(0, 150)}`;
+          }
+        }
+      } catch (e) {
+        // ignore text read error
+      }
+      throw new Error(errorMessage);
     }
 
     const json = await response.json();

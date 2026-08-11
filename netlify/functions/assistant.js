@@ -1,10 +1,25 @@
 const fetch = globalThis.fetch;
 
 exports.handler = async (event) => {
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Content-Type": "application/json",
+  };
+
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers,
+      body: "",
+    };
+  }
+
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ error: "Método no permitido" }),
     };
   }
@@ -16,7 +31,7 @@ exports.handler = async (event) => {
     if (!message || typeof message !== "string") {
       return {
         statusCode: 400,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ error: "No se proporcionó un mensaje para el asistente." }),
       };
     }
@@ -25,7 +40,7 @@ exports.handler = async (event) => {
     if (!apiKey) {
       return {
         statusCode: 500,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           error: "La clave GEMINI_API_KEY no está configurada en Netlify. Por favor agrégala en Netlify (Site settings > Environment variables).",
         }),
@@ -90,7 +105,7 @@ ${JSON.stringify(history || [])}
 MENSAJE DEL USUARIO: "${message}"
 `;
 
-    const payload = {
+    const basePayload = {
       systemInstruction: {
         parts: [{ text: systemInstructionText }],
       },
@@ -142,22 +157,34 @@ MENSAJE DEL USUARIO: "${message}"
     };
 
     let responseText = "";
-    const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const modelsToTry = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"];
     let lastErrorDetails = "";
 
     for (const model of modelsToTry) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000); // 7s maximum per model attempt
+
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        
+        const currentPayload = JSON.parse(JSON.stringify(basePayload));
+        if (model === "gemini-2.5-flash") {
+          currentPayload.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+        }
+
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(currentPayload),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!res.ok) {
           const errText = await res.text();
           console.warn(`Error Netlify Assistant [${model}] status ${res.status}:`, errText);
-          lastErrorDetails = `Status ${res.status}: ${errText}`;
+          lastErrorDetails = `Model ${model} (HTTP ${res.status}): ${errText}`;
           continue;
         }
 
@@ -169,17 +196,19 @@ MENSAJE DEL USUARIO: "${message}"
         }
       } catch (err) {
         console.warn(`Excepción Netlify Assistant [${model}]:`, err);
-        lastErrorDetails = err?.message || String(err);
+        lastErrorDetails = err?.name === "AbortError"
+          ? `Model ${model} request timed out (7s limit)`
+          : (err?.message || String(err));
       }
     }
 
     if (!responseText) {
       return {
         statusCode: 500,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
-          error: "No se pudo obtener respuesta del modelo AI del asistente.",
-          details: lastErrorDetails,
+          error: "No se pudo obtener respuesta de la Inteligencia Artificial.",
+          details: lastErrorDetails || "Verifica que GEMINI_API_KEY en Netlify sea válida y esté activa.",
         }),
       };
     }
@@ -203,16 +232,16 @@ MENSAJE DEL USUARIO: "${message}"
 
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ success: true, data: parsedData }),
     };
   } catch (error) {
     console.error("Error en Netlify Function assistant:", error);
     return {
       statusCode: 500,
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
-        error: "Ocurrió un error al procesar tu solicitud con el Asistente.",
+        error: "Ocurrió un error en el servidor de Netlify al procesar tu consulta.",
         details: error?.message || String(error),
       }),
     };
