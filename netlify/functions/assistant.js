@@ -1,4 +1,4 @@
-const { GoogleGenAI, Type } = require("@google/genai");
+const fetch = globalThis.fetch;
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -27,21 +27,12 @@ exports.handler = async (event) => {
         statusCode: 500,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          error: "La clave GEMINI_API_KEY no está configurada en las variables de entorno de Netlify.",
+          error: "La clave GEMINI_API_KEY no está configurada en Netlify. Por favor agrégala en Netlify (Site settings > Environment variables).",
         }),
       };
     }
 
-    const ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
-
-    const systemInstruction = `
+    const systemInstructionText = `
 Eres el ASISTENTE FINANCIERO inteligente integrado exclusivamente en la aplicación "Mi Billetera".
 Tu objetivo es ayudar al usuario con su gestión financiera basándote ÚNICAMENTE en sus DATOS REALES.
 
@@ -99,75 +90,97 @@ ${JSON.stringify(history || [])}
 MENSAJE DEL USUARIO: "${message}"
 `;
 
-    const responseSchema = {
-      type: Type.OBJECT,
-      properties: {
-        reply: {
-          type: Type.STRING,
-          description: "Mensaje textual claro, cortés y conciso para el usuario en español.",
+    const payload = {
+      systemInstruction: {
+        parts: [{ text: systemInstructionText }],
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: contextText }],
         },
-        action: {
-          type: Type.STRING,
-          description: "Acción requerida: 'NONE', 'ASK_MISSING', 'PREVIEW_CONFIRM', 'OUT_OF_SCOPE', 'PURCHASE_EVALUATION'",
-        },
-        pendingTransaction: {
-          type: Type.OBJECT,
-          description: "Datos del movimiento detectado si todos los campos obligatorios están presentes, o null si falta alguno.",
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
           properties: {
-            type: { type: Type.STRING, description: "'gasto' o 'ingreso'" },
-            amount: { type: Type.NUMBER, description: "Monto positivo en números" },
-            concept: { type: Type.STRING, description: "Descripción o concepto del movimiento" },
-            category: { type: Type.STRING, description: "Categoría de gasto o ingreso" },
-            date: { type: Type.STRING, description: "Fecha en YYYY-MM-DD" },
-            time: { type: Type.STRING, description: "Hora en HH:mm" },
-            paymentMethod: { type: Type.STRING, description: "Nombre exacto de la cuenta / método de pago" },
-            notes: { type: Type.STRING, description: "Notas adicionales opcionales" },
+            reply: {
+              type: "STRING",
+              description: "Mensaje textual claro, cortés y conciso para el usuario en español.",
+            },
+            action: {
+              type: "STRING",
+              description: "Acción requerida: 'NONE', 'ASK_MISSING', 'PREVIEW_CONFIRM', 'OUT_OF_SCOPE', 'PURCHASE_EVALUATION'",
+            },
+            pendingTransaction: {
+              type: "OBJECT",
+              description: "Datos del movimiento detectado si todos los campos obligatorios están presentes, o null si falta alguno.",
+              properties: {
+                type: { type: "STRING", description: "'gasto' o 'ingreso'" },
+                amount: { type: "NUMBER", description: "Monto positivo en números" },
+                concept: { type: "STRING", description: "Descripción o concepto del movimiento" },
+                category: { type: "STRING", description: "Categoría de gasto o ingreso" },
+                date: { type: "STRING", description: "Fecha en YYYY-MM-DD" },
+                time: { type: "STRING", description: "Hora en HH:mm" },
+                paymentMethod: { type: "STRING", description: "Nombre exacto de la cuenta / método de pago" },
+                notes: { type: "STRING", description: "Notas adicionales opcionales" },
+              },
+            },
+            isRiskyPurchase: {
+              type: "BOOLEAN",
+              description: "true si la compra provoca o empeora saldo negativo o excede presupuesto",
+            },
+            riskReason: {
+              type: "STRING",
+              description: "Razón detallada de riesgo si aplica",
+            },
           },
-        },
-        isRiskyPurchase: {
-          type: Type.BOOLEAN,
-          description: "true si la compra provoca o empeora saldo negativo o excede presupuesto",
-        },
-        riskReason: {
-          type: Type.STRING,
-          description: "Razón detallada de riesgo si aplica",
+          required: ["reply", "action"],
         },
       },
-      required: ["reply", "action"],
     };
 
     let responseText = "";
+    const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    let lastErrorDetails = "";
 
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: contextText,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema,
-        },
-      });
-      responseText = response.text || "";
-    } catch (err25) {
-      console.warn("Fallo con gemini-2.5-flash, probando gemini-2.0-flash:", err25);
-      const fallbackRes = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: contextText,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema,
-        },
-      });
-      responseText = fallbackRes.text || "";
+    for (const model of modelsToTry) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.warn(`Error Netlify Assistant [${model}] status ${res.status}:`, errText);
+          lastErrorDetails = `Status ${res.status}: ${errText}`;
+          continue;
+        }
+
+        const data = await res.json();
+        const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (candidateText) {
+          responseText = candidateText;
+          break;
+        }
+      } catch (err) {
+        console.warn(`Excepción Netlify Assistant [${model}]:`, err);
+        lastErrorDetails = err?.message || String(err);
+      }
     }
 
     if (!responseText) {
       return {
         statusCode: 500,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "No se obtuvo respuesta del modelo AI del asistente." }),
+        body: JSON.stringify({
+          error: "No se pudo obtener respuesta del modelo AI del asistente.",
+          details: lastErrorDetails,
+        }),
       };
     }
 
