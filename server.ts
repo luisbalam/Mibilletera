@@ -274,33 +274,22 @@ MENSAJE DEL USUARIO: "${message}"
 
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.6-flash",
-          contents: {
-            parts: [
-              { text: systemInstruction },
-              { text: contextText },
-            ],
-          },
+          model: "gemini-2.5-flash",
+          contents: contextText,
           config: {
-            thinkingConfig: {
-              thinkingLevel: ThinkingLevel.MINIMAL,
-            },
+            systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
           },
         });
         responseText = response.text || "";
-      } catch (err36) {
-        console.warn("Fallo con gemini-3.6-flash en asistente, usando fallback gemini-2.5-flash:", err36);
+      } catch (err25) {
+        console.warn("Fallo con gemini-2.5-flash, usando fallback gemini-2.0-flash:", err25);
         const fallbackRes = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: {
-            parts: [
-              { text: systemInstruction },
-              { text: contextText },
-            ],
-          },
+          model: "gemini-2.0-flash",
+          contents: contextText,
           config: {
+            systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
           },

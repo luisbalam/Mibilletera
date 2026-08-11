@@ -1,9 +1,10 @@
-const { GoogleGenAI, Type, ThinkingLevel } = require("@google/genai");
+const { GoogleGenAI, Type } = require("@google/genai");
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ error: "Método no permitido" }),
     };
   }
@@ -15,6 +16,7 @@ exports.handler = async (event) => {
     if (!message || typeof message !== "string") {
       return {
         statusCode: 400,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ error: "No se proporcionó un mensaje para el asistente." }),
       };
     }
@@ -23,6 +25,7 @@ exports.handler = async (event) => {
     if (!apiKey) {
       return {
         statusCode: 500,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           error: "La clave GEMINI_API_KEY no está configurada en las variables de entorno de Netlify.",
         }),
@@ -57,7 +60,7 @@ REGLAS STRICTAS Y OBLIGATORIAS:
      * "reply": Responde directamente con la información solicitada en un tono claro y conciso.
      * NUNCA generes un registro de movimiento ni pidas confirmación de guardado para preguntas o consultas de información.
 
-5. REGISTRO DE NUEVO GASTO O INGRESO (SOLO CUANDO EL USUARIO QUIERE REGISTRAR O REPORTE UN NUEVO MOVIMIENTO):
+5. REGISTRO DE NUEVO GASTO O INGRESO (SOLO CUANDO EL USUARIO QUIERE REGISTRAR O REPORTA UN NUEVO MOVIMIENTO):
    - Para registrar un nuevo gasto o ingreso (ej: "Gasté $250 en gasolina hoy", "Anota un ingreso de $3000 por nómina"):
    - Los 3 DATOS MANDATORIOS OBLIGATORIOS son:
      1) MONTO (monto > 0)
@@ -137,33 +140,22 @@ MENSAJE DEL USUARIO: "${message}"
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: {
-          parts: [
-            { text: systemInstruction },
-            { text: contextText },
-          ],
-        },
+        model: "gemini-2.5-flash",
+        contents: contextText,
         config: {
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel ? ThinkingLevel.MINIMAL : undefined,
-          },
+          systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
         },
       });
       responseText = response.text || "";
-    } catch (err36) {
-      console.warn("Fallo con gemini-3.6-flash en asistente, usando fallback gemini-2.5-flash:", err36);
+    } catch (err25) {
+      console.warn("Fallo con gemini-2.5-flash, probando gemini-2.0-flash:", err25);
       const fallbackRes = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: {
-          parts: [
-            { text: systemInstruction },
-            { text: contextText },
-          ],
-        },
+        model: "gemini-2.0-flash",
+        contents: contextText,
         config: {
+          systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
         },
@@ -174,6 +166,7 @@ MENSAJE DEL USUARIO: "${message}"
     if (!responseText) {
       return {
         statusCode: 500,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ error: "No se obtuvo respuesta del modelo AI del asistente." }),
       };
     }
@@ -197,12 +190,14 @@ MENSAJE DEL USUARIO: "${message}"
 
     return {
       statusCode: 200,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ success: true, data: parsedData }),
     };
   } catch (error) {
     console.error("Error en Netlify Function assistant:", error);
     return {
       statusCode: 500,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         error: "Ocurrió un error al procesar tu solicitud con el Asistente.",
         details: error?.message || String(error),
