@@ -139,14 +139,20 @@ MENSAJE DEL USUARIO: "${message || ''}"
     const contentsParts = [];
 
     if (mediaAttachment && mediaAttachment.base64) {
-      let cleanBase64 = mediaAttachment.base64;
-      if (cleanBase64.includes(",")) {
+      let cleanBase64 = String(mediaAttachment.base64);
+      if (cleanBase64.includes(";base64,")) {
+        cleanBase64 = cleanBase64.split(";base64,")[1];
+      } else if (cleanBase64.includes(",")) {
         cleanBase64 = cleanBase64.split(",")[1];
       }
+      cleanBase64 = cleanBase64.trim();
 
       let mimeType = mediaAttachment.mimeType;
       if (!mimeType) {
-        mimeType = mediaAttachment.type === "image" ? "image/jpeg" : "audio/mp3";
+        mimeType = mediaAttachment.type === "image" ? "image/jpeg" : "audio/webm";
+      }
+      if (mimeType.includes(";")) {
+        mimeType = mimeType.split(";")[0].trim();
       }
 
       contentsParts.push({
@@ -172,6 +178,7 @@ MENSAJE DEL USUARIO: "${message || ''}"
         },
         pendingTransaction: {
           type: Type.OBJECT,
+          nullable: true,
           description: "Datos del movimiento detectado si todos los campos obligatorios están presentes, o null si falta alguno.",
           properties: {
             type: { type: Type.STRING, description: "'gasto' o 'ingreso'" },
@@ -186,10 +193,12 @@ MENSAJE DEL USUARIO: "${message || ''}"
         },
         isRiskyPurchase: {
           type: Type.BOOLEAN,
+          nullable: true,
           description: "true si la compra provoca o empeora saldo negativo o excede presupuesto",
         },
         riskReason: {
           type: Type.STRING,
+          nullable: true,
           description: "Razón detallada de riesgo si aplica",
         },
       },
@@ -197,36 +206,63 @@ MENSAJE DEL USUARIO: "${message || ''}"
     };
 
     let responseText = "";
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: contentsParts,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema,
-        },
-      });
-      responseText = response.text || "";
-    } catch (err36) {
-      console.warn("Fallo gemini-3.6-flash en Netlify, probando fallback gemini-flash-latest:", err36);
-      const responseFallback = await ai.models.generateContent({
-        model: "gemini-flash-latest",
-        contents: contentsParts,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema,
-        },
-      });
-      responseText = responseFallback.text || "";
+    let lastError = null;
+
+    const modelsToTry = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.6-flash"];
+
+    // Try with structured schema first across models
+    for (const modelName of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: contentsParts,
+          config: {
+            systemInstruction,
+            responseMimeType: "application/json",
+            responseSchema,
+          },
+        });
+        if (response.text) {
+          responseText = response.text;
+          break;
+        }
+      } catch (err) {
+        lastError = err;
+        console.warn(`Fallback Netlify para modelo ${modelName} con schema:`, err?.message || err);
+      }
+    }
+
+    // Fallback without strict schema if schema validation failed
+    if (!responseText) {
+      for (const modelName of modelsToTry) {
+        try {
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: contentsParts,
+            config: {
+              systemInstruction: systemInstruction + "\nINSTRUCCIÓN CRÍTICA: Debes responder ÚNICAMENTE en formato JSON plano con las claves 'reply' y 'action' y 'pendingTransaction'.",
+              responseMimeType: "application/json",
+            },
+          });
+          if (response.text) {
+            responseText = response.text;
+            break;
+          }
+        } catch (err) {
+          lastError = err;
+          console.warn(`Fallback Netlify para modelo ${modelName} sin schema:`, err?.message || err);
+        }
+      }
     }
 
     if (!responseText) {
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: "No se obtuvo respuesta del modelo AI." }),
+        body: JSON.stringify({
+          error: "No se pudo obtener respuesta del modelo AI.",
+          details: lastError?.message || "Servicio no disponible temporalmente.",
+        }),
       };
     }
 
