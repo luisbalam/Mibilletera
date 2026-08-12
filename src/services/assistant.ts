@@ -10,11 +10,19 @@ export interface AssistantApiResponse {
   riskReason?: string;
 }
 
+export interface AssistantMediaInput {
+  type: 'image' | 'audio';
+  base64: string;
+  mimeType: string;
+  fileName?: string;
+}
+
 export async function askAssistant(
   userMessage: string,
   history: AssistantMessage[],
   transactions: Transaction[],
-  stats: SummaryStats
+  stats: SummaryStats,
+  mediaAttachment?: AssistantMediaInput
 ): Promise<AssistantApiResponse> {
   try {
     // Calculate per-account balances from actual transactions
@@ -58,8 +66,10 @@ export async function askAssistant(
       },
       body: JSON.stringify({
         message: userMessage,
+        mediaAttachment: mediaAttachment || null,
         history: transientHistory,
         context: {
+          userName: 'Luis',
           currentDate: getCurrentDateStr(),
           totalBalance: stats.totalBalance,
           accountBalances,

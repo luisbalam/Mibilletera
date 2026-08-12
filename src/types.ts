@@ -100,6 +100,13 @@ export interface AssistantPendingTransaction {
   notes?: string;
 }
 
+export interface AssistantMediaAttachment {
+  type: 'image' | 'audio';
+  url: string;
+  name?: string;
+  mimeType?: string;
+}
+
 export interface AssistantMessage {
   id: string;
   sender: 'user' | 'assistant';
@@ -111,4 +118,5 @@ export interface AssistantMessage {
   riskReason?: string;
   confirmed?: boolean;
   cancelled?: boolean;
+  mediaAttachment?: AssistantMediaAttachment;
 }

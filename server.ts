@@ -165,10 +165,10 @@ Campos a extraer:
   // AI Financial Assistant Endpoint
   app.post("/api/assistant", async (req, res) => {
     try {
-      const { message, history, context } = req.body;
+      const { message, mediaAttachment, history, context } = req.body;
 
-      if (!message || typeof message !== "string") {
-        return res.status(400).json({ error: "No se proporcionó un mensaje para el asistente." });
+      if (!message && !mediaAttachment) {
+        return res.status(400).json({ error: "No se proporcionó un mensaje o archivo para el asistente." });
       }
 
       const apiKey = process.env.GEMINI_API_KEY;
@@ -178,53 +178,82 @@ Campos a extraer:
         });
       }
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      const userName = context?.userName || 'Luis';
 
       const systemInstruction = `
 Eres el ASISTENTE FINANCIERO inteligente integrado exclusivamente en la aplicación "Mi Billetera".
-Tu objetivo es ayudar al usuario con su gestión financiera basándote ÚNICAMENTE en sus DATOS REALES.
+Tu usuario principal se llama ${userName}.
 
-REGLAS STRICTAS Y OBLIGATORIAS:
-1. NUNCA inventes saldos, cuentas, movimientos, categorías, fechas o montos.
-2. Si el usuario realiza preguntas fuera del ámbito de Mi Billetera (ej: cultura general, deportes, historia, geografía):
-   - Asigna "action": "OUT_OF_SCOPE".
+OBJETIVO GENERAL:
+Ayudar a ${userName} a registrar, consultar y gestionar sus finanzas personales basándote ÚNICAMENTE en datos reales proporcionados por él a través de texto, imágenes de tickets/recibos o notas de voz/audios.
+
+REGLAS DE INTERACCIÓN Y USO DEL NOMBRE:
+1. Dirígete SIEMPRE al usuario llamándolo por su nombre ("${userName}") de forma cordial, profesional y personalizada en tus respuestas ("reply").
+2. NUNCA inventes saldos, montos, conceptos, fechas ni categorías.
+
+REGLAS PARA PROCESAMIENTO DE IMÁGENES (Tickets, recibos, capturas de compras o notas escritas):
+1. Analiza con máxima precisión la imagen adjunta.
+2. Intenta extraer los 3 DATOS MANDATORIOS:
+   - MONTO (número positivo > 0)
+   - FECHA (formato YYYY-MM-DD; si no figura en la imagen, asume la fecha actual del sistema: ${context?.currentDate || new Date().toISOString().substring(0, 10)})
+   - DESCRIPCIÓN/CONCEPTO (comercio, producto o servicio)
+3. SI LA IMAGEN NO TIENE QUE VER CON GASTOS NI TRANSACCIONES FINANCIERAS (ej: foto personal, paisaje, meme, animal o documento no financiero):
+   - "action": "OUT_OF_SCOPE"
    - "pendingTransaction": null
-   - Responde exactamente: "Estoy diseñado para ayudarte con Mi Billetera y con la información financiera registrada en ella. No puedo ayudarte con esa consulta."
-3. NOMBRES DE CUENTAS: Usa los nombres reales de las cuentas/métodos de pago provistos en el contexto (ej: "BBVA Débito", "Tarjeta Nu", "Efectivo", "Tarjeta Débito", "Tarjeta Crédito", "Transferencia"). NUNCA digas "tu cuenta bancaria" si hay un nombre real.
+   - "reply": "Hola ${userName}, la imagen adjunta no contiene información sobre un ticket, recibo o gasto para Tu Billetera. Por favor envía un comprobante o apunte de gasto válido."
+4. SI LA IMAGEN ES DE UN GASTO/TICKET PERO UN DATO NO SE VE, ESTÁ BORROSO, INCOMPLETO O DUDOSO:
+   - NUNCA inventes el dato dudoso.
+   - "action": "ASK_MISSING"
+   - "pendingTransaction": null
+   - "reply": Pregunta amablemente a ${userName} específicamente por el dato que falta o no es claro (ej: "Hola ${userName}, observo el recibo pero no se distingue claramente el monto total. ¿Podrías confirmarme cuánto pagaste?").
 
-4. CONSULTAS DE SALDO, HISTORIAL Y PRESUPUESTOS (IMPORTANTE - SIN REGISTRO EN BASE DE DATOS):
-   - Cuando el usuario solicite consultar su saldo (ej: "¿Cuánto dinero tengo?", "Ver saldo"), consultar gastos pasados (ej: "¿Cuánto gasté ayer?", "¿En qué gasté este mes?"), o consultar si le alcanza el presupuesto para algo:
-     * "action": "NONE"
-     * "pendingTransaction": null
-     * "reply": Responde directamente con la información solicitada en un tono claro y conciso.
-     * NUNCA generes un registro de movimiento ni pidas confirmación de guardado para preguntas o consultas de información.
+REGLAS PARA PROCESAMIENTO DE AUDIO (Notas de voz o archivos de audio):
+1. Escucha y transcribe con total precisión el audio adjunto.
+2. Intenta extraer los 3 DATOS MANDATORIOS:
+   - MONTO (número positivo > 0)
+   - FECHA (formato YYYY-MM-DD; si en el audio dice "hoy", usa la fecha actual ${context?.currentDate}; si dice "ayer", calcula el día anterior; si no especifica fecha, asume la fecha actual)
+   - DESCRIPCIÓN/CONCEPTO (motivo o detalle del gasto o ingreso)
+3. SI EL AUDIO NO TIENE QUE VER CON GASTOS NI FINANZAS (ej: un saludo aislado, ruido, música, conversación ajena):
+   - "action": "OUT_OF_SCOPE"
+   - "pendingTransaction": null
+   - "reply": "Hola ${userName}, en el audio enviado no identifiqué ninguna mención sobre un gasto o movimiento financiero para Tu Billetera."
+4. SI EN EL AUDIO FALTA O ES DUDOSO ALGÚN DATO MANDATORIO (monto no mencionado, concepto vago o indescifrable):
+   - NUNCA inventes el dato.
+   - "action": "ASK_MISSING"
+   - "pendingTransaction": null
+   - "reply": Pregunta respetuosamente a ${userName} por el dato faltante (ej: "Hola ${userName}, escuché que pagaste la cuenta del restaurante, pero no mencionaste el monto. ¿De cuánto fue el gasto?").
 
-5. REGISTRO DE NUEVO GASTO O INGRESO (SOLO CUANDO EL USUARIO QUIERE REGISTRAR O REPORTE UN NUEVO MOVIMIENTO):
-   - Para registrar un nuevo gasto o ingreso (ej: "Gasté $250 en gasolina hoy", "Anota un ingreso de $3000 por nómina"):
-   - Los 3 DATOS MANDATORIOS OBLIGATORIOS son:
-     1) MONTO (monto > 0)
-     2) CONCEPTO/DESCRIPCIÓN
-     3) FECHA (formato YYYY-MM-DD)
-   - Si FALTA CUALQUIERA de estos 3 datos obligatorios:
-     - "action": "ASK_MISSING"
-     - "pendingTransaction": null
-     - "reply": Pregunta específicamente y de forma amable únicamente por el dato faltante.
-   - Si los 3 datos obligatorios ESTÁN PRESENTES y el usuario solicitó registrar un movimiento:
-     - "action": "PREVIEW_CONFIRM"
-     - Evalúa si el gasto causaría saldo negativo en el total o en la cuenta especificada, o si excede el presupuesto disponible de la categoría.
-     - Si causaría o empeoraría un saldo negativo o excedería el presupuesto:
-       - "isRiskyPurchase": true
-       - Explicar las cifras reales en "reply" advirtiendo el problema y preguntar: "¿Aun así deseas registrarla?"
-     - De lo contrario:
-       - "isRiskyPurchase": false
-       - En "reply" presenta un resumen claro de los datos del movimiento y pregunta: "¿Deseas guardarlo?"
+REGLAS PARA REGISTRO DE MOVIMIENTOS COMPLETOS:
+1. Cuando los 3 datos mandatorios (Monto, Concepto y Fecha) estén claros y confirmados (vía texto, imagen o audio):
+   - "action": "PREVIEW_CONFIRM"
+   - Rellena "pendingTransaction" con type ('gasto' o 'ingreso'), amount, concept, category (de la lista de categorías válidas), date, time y paymentMethod.
+   - Evalúa si el gasto causaría saldo negativo en el total o en la cuenta de pago, o si excede el presupuesto disponible de la categoría.
+   - Si causa saldo negativo o excede presupuesto:
+     - "isRiskyPurchase": true
+     - "reply": Advierte a ${userName} del impacto financiero con cifras reales y pregunta: "Hola ${userName}, ... ¿Aun así deseas registrar esta compra?"
+   - De lo contrario:
+     - "isRiskyPurchase": false
+     - "reply": "Hola ${userName}, he preparado el registro del gasto por $X.XX MXN en [Categoría]... ¿Deseas guardarlo?"
 
-6. FORMATO DE RESPUESTA:
-   Debes responder ÚNICAMENTE en JSON válido con el esquema especificado.
+REGLAS PARA PREGUNTAS / CONSULTAS DE SALDO O HISTORIAL:
+1. Si ${userName} solo consulta saldos, gastos pasados o presupuesto:
+   - "action": "NONE"
+   - "pendingTransaction": null
+   - "reply": Responde directamente dirigiéndote a ${userName}.
 `;
 
       const contextText = `
 CONTEXTO REAL DEL USUARIO (Fecha actual del sistema: ${context?.currentDate || new Date().toISOString().substring(0, 10)}):
+- Nombre del usuario: ${userName}
 - Saldo Total Disponible: $${context?.totalBalance ?? 0} MXN
 - Cuentas / Métodos de Pago disponibles: ${JSON.stringify(context?.accountBalances || [])}
 - Estadísticas del Mes Actual: ${JSON.stringify(context?.monthlyStats || {})}
@@ -235,15 +264,38 @@ CONTEXTO REAL DEL USUARIO (Fecha actual del sistema: ${context?.currentDate || n
 HISTORIAL DE CONVERSACIÓN RECIENTE (Transitorio):
 ${JSON.stringify(history || [])}
 
-MENSAJE DEL USUARIO: "${message}"
+MENSAJE DEL USUARIO: "${message || ''}"
 `;
+
+      const contentsParts: any[] = [];
+
+      if (mediaAttachment && mediaAttachment.base64) {
+        let cleanBase64 = mediaAttachment.base64;
+        if (cleanBase64.includes(",")) {
+          cleanBase64 = cleanBase64.split(",")[1];
+        }
+
+        let mimeType = mediaAttachment.mimeType;
+        if (!mimeType) {
+          mimeType = mediaAttachment.type === "image" ? "image/jpeg" : "audio/mp3";
+        }
+
+        contentsParts.push({
+          inlineData: {
+            data: cleanBase64,
+            mimeType: mimeType,
+          },
+        });
+      }
+
+      contentsParts.push({ text: contextText });
 
       const responseSchema = {
         type: Type.OBJECT,
         properties: {
           reply: {
             type: Type.STRING,
-            description: "Mensaje textual claro, cortés y conciso para el usuario en español.",
+            description: "Mensaje textual claro, cortés y dirigiéndose al usuario por su nombre en español.",
           },
           action: {
             type: Type.STRING,
@@ -280,7 +332,7 @@ MENSAJE DEL USUARIO: "${message}"
       try {
         const response = await ai.models.generateContent({
           model: "gemini-3.6-flash",
-          contents: contextText,
+          contents: contentsParts,
           config: {
             systemInstruction,
             responseMimeType: "application/json",
@@ -292,7 +344,7 @@ MENSAJE DEL USUARIO: "${message}"
         console.warn("Fallo con gemini-3.6-flash en asistente, intentando fallback con gemini-flash-latest:", err36);
         const fallbackRes = await ai.models.generateContent({
           model: "gemini-flash-latest",
-          contents: contextText,
+          contents: contentsParts,
           config: {
             systemInstruction,
             responseMimeType: "application/json",
