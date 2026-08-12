@@ -214,7 +214,11 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
       }, 1000);
     } catch (err: any) {
       console.error('Error al acceder al micrófono:', err);
-      showToast('No se pudo acceder al micrófono. Verifica los permisos.', 'info');
+      if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission denied')) {
+        showToast('Permiso de micrófono denegado. Permite el acceso o sube un archivo de audio con 📎', 'info');
+      } else {
+        showToast('No se pudo acceder al micrófono. Intenta subir tu nota de voz con el botón 📎', 'info');
+      }
     }
   };
 
