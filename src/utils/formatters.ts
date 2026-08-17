@@ -134,6 +134,20 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
 /**
  * Category color mappings for badges & icons
  */
+export function formatMonthName(yearMonth: string): string {
+  if (!yearMonth || yearMonth === 'all') return 'Todos los meses';
+  const [yearStr, monthStr] = yearMonth.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  if (!year || !month || isNaN(year) || isNaN(month)) return yearMonth;
+  const date = new Date(year, month - 1, 1);
+  const name = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(date);
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/**
+ * Category color mappings for badges & icons
+ */
 export function getCategoryBgColor(category: Category, type: TransactionType): string {
   if (type === 'ingreso') {
     return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
