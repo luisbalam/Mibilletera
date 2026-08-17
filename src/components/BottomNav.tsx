@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, History, Plus, PieChart, Settings, Bot } from 'lucide-react';
+import { LayoutDashboard, History, Plus, PieChart, Settings } from 'lucide-react';
 import { ViewTab } from '../types';
 
 interface BottomNavProps {
@@ -13,12 +13,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   currentTab,
   onSelectTab,
   onOpenNewTransactionModal,
-  onOpenAssistant,
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/85 dark:bg-[#0b0f19]/85 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800/80 pb-safe shadow-2xl">
       <div className="max-w-md mx-auto px-2 py-2 flex items-center justify-between">
-        {/* Dashboard */}
+        {/* 1. Inicio */}
         <button
           onClick={() => onSelectTab('dashboard')}
           id="nav-tab-dashboard"
@@ -32,7 +31,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <span className="text-[10px] tracking-tight">Inicio</span>
         </button>
 
-        {/* Historial */}
+        {/* 2. Historial */}
         <button
           onClick={() => onSelectTab('historial')}
           id="nav-tab-historial"
@@ -46,7 +45,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <span className="text-[10px] tracking-tight">Historial</span>
         </button>
 
-        {/* Central Action Button: Nuevo Movimiento */}
+        {/* 3. Central Action Button: Nuevo Movimiento */}
         <button
           onClick={onOpenNewTransactionModal}
           id="nav-tab-nuevo-movimiento"
@@ -61,20 +60,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           </span>
         </button>
 
-        {/* Assistant */}
-        {onOpenAssistant && (
-          <button
-            onClick={onOpenAssistant}
-            id="nav-tab-asistente"
-            className="flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-2xl transition-all cursor-pointer text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 font-bold"
-            title="Abrir Asistente Financiero"
-          >
-            <Bot className="w-5 h-5 stroke-[2.5]" />
-            <span className="text-[10px] tracking-tight font-extrabold">Asistente</span>
-          </button>
-        )}
-
-        {/* Resumen */}
+        {/* 4. Análisis (Resumen) */}
         <button
           onClick={() => onSelectTab('resumen')}
           id="nav-tab-resumen"
@@ -86,6 +72,20 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         >
           <PieChart className="w-5 h-5 stroke-[2.2]" />
           <span className="text-[10px] tracking-tight">Análisis</span>
+        </button>
+
+        {/* 5. Configuración */}
+        <button
+          onClick={() => onSelectTab('configuracion')}
+          id="nav-tab-configuracion"
+          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-2xl transition-all cursor-pointer ${
+            currentTab === 'configuracion'
+              ? 'text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-500/10'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
+          }`}
+        >
+          <Settings className="w-5 h-5 stroke-[2.2]" />
+          <span className="text-[10px] tracking-tight">Configuración</span>
         </button>
       </div>
     </div>
